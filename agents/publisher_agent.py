@@ -1,45 +1,45 @@
 import json
 import os
 from datetime import datetime
+from utils.logger import log
 
 
 class PublisherAgent:
     """
-    Final agent responsible for publishing or exporting creatives.
-    In MVP mode, this exports assets and logs publish intent.
+    Publishes approved content.
+
+    NOTE:
+    For this prototype dry run, actual publishing and image uploads
+    are intentionally disabled to keep the demo deterministic.
     """
 
     def run(
         self,
         creatives: dict,
         captions: dict,
+        post_to_linkedin: bool = False,
         output_dir: str = "outputs",
     ) -> str:
         os.makedirs(output_dir, exist_ok=True)
 
+        log("PublisherAgent", "Preparing publish manifest (dry run)")
+
         manifest = {
-            "status": "exported",
+            "status": "approved",
             "timestamp": datetime.utcnow().isoformat(),
-            "platforms": {}
+            "linkedin": {
+                "local_image": creatives.get("linkedin"),
+                "caption": captions.get("linkedin"),
+            }
         }
 
-        for platform, image_path in creatives.items():
-            caption = captions.get(platform)
-
-            manifest["platforms"][platform] = {
-                "image": image_path,
-                "caption": caption
-            }
-
-            print(f"[PublisherAgent] Ready for {platform}")
-            print(f"  Image: {image_path}")
-            print(f"  Caption: {caption}\n")
-
         manifest_path = os.path.join(output_dir, "publish_manifest.json")
-
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
 
-        print(f"[PublisherAgent] Export complete → {manifest_path}")
+        log(
+            "PublisherAgent",
+            f"Publishing skipped. Manifest written → {manifest_path}"
+        )
 
         return manifest_path

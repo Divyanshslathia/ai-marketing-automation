@@ -1,35 +1,38 @@
 import streamlit as st
 import tempfile
-from datetime import datetime
 import time
 
-# Note: BriefAgent is removed as it is now consolidated into CopyAgent
 from agents.copy_agent import CopyAgent
 from agents.layout_agent import LayoutAgent
 from agents.resize_agent import ResizeAgent
-from agents.publisher_agent import PublisherAgent
+from agents.publisher_agent import PublisherAgent  # kept for intent
 
 
 st.set_page_config(page_title="AI Marketing Automation", layout="centered")
-
 st.title("AI-First Marketing Automation Prototype")
 
 # ----------------------------
-# Step 1: User Inputs
+# Step 1: Product Inputs
 # ----------------------------
 
 st.header("1. Product Inputs")
 
-uploaded_image = st.file_uploader("Upload product image", type=["jpg", "png", "jpeg"])
+uploaded_image = st.file_uploader(
+    "Upload product image",
+    type=["jpg", "png", "jpeg"]
+)
 
 product_name = st.text_input("Product name")
 features = st.text_area("Key features (comma-separated)")
-tone = st.selectbox("Brand tone", ["premium", "playful", "minimal", "luxury"])
+tone = st.selectbox(
+    "Brand tone",
+    ["premium", "playful", "minimal", "luxury"]
+)
 
 generate_clicked = st.button("Generate Marketing Creatives")
 
 # ----------------------------
-# Step 2: Generate
+# Step 2: Generate (AI)
 # ----------------------------
 
 if generate_clicked:
@@ -38,7 +41,7 @@ if generate_clicked:
     else:
         with st.spinner("Running AI pipeline..."):
 
-            # Save uploaded image to temp file
+            # Save uploaded image
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                 tmp.write(uploaded_image.read())
                 image_path = tmp.name
@@ -49,98 +52,89 @@ if generate_clicked:
                 "tone": tone,
             }
 
-            # Run consolidated agent to get both brief and copy in one call
-            # This saves API quota and reduces latency
+            # Consolidated AI call (reduced quota usage)
             marketing_data = CopyAgent().run(inputs)
-            
-            # Artificial delay to prevent rapid-fire API hits
-            time.sleep(1)
+
+            time.sleep(1)  # gentle throttle
 
             st.session_state["image_path"] = image_path
-            st.session_state["brief"] = marketing_data.get("brief", {})
-            st.session_state["copy"] = marketing_data  # Contains headlines and captions
+            st.session_state["copy"] = marketing_data
 
 # ----------------------------
-# Step 3: Review & Approval
+# Step 3: Review & Approve
 # ----------------------------
 
 if "copy" in st.session_state:
     st.divider()
     st.header("2. Review & Approve")
-    
-    # Display brief for context
-    if "brief" in st.session_state:
-        with st.expander("View Campaign Strategy"):
-            st.write(f"**Target Audience:** {st.session_state['brief'].get('target_audience')}")
-            st.write(f"**Value Prop:** {st.session_state['brief'].get('key_value_prop')}")
 
     copy = st.session_state["copy"]
 
+    # Headline selection
     selected_headline = st.radio(
         "Select headline",
-        copy.get("headlines", ["Error: No headlines generated"])
+        copy.get("headlines", [])
     )
 
-    st.subheader("Captions")
+    # --- NEW: captions for all platforms ---
+    st.subheader("Captions (Choose one per platform)")
 
     selected_captions = {}
-    # Use .get() to avoid KeyErrors if the AI response is malformed
-    for platform, options in copy.get("captions", {}).items():
+
+    captions_by_platform = copy.get("captions", {})
+
+    for platform, options in captions_by_platform.items():
+        if not options:
+            continue
+
         selected_captions[platform] = st.radio(
             f"{platform.capitalize()} caption",
             options,
-            key=platform
+            key=f"caption_{platform}"
         )
 
-    approve = st.button("Approve & Continue")
+    approve_clicked = st.button("Approve & Continue")
 
-    if approve:
+    if approve_clicked:
         st.session_state["headline"] = selected_headline
         st.session_state["captions"] = selected_captions
-        st.success("Approved! Proceed to Publish step below.")
+        st.success("Approved. Proceed to creative generation.")
 
 # ----------------------------
-# Step 4: Publish Options
+# Step 4: Generate Creatives (Dry Run)
 # ----------------------------
 
 if "headline" in st.session_state:
     st.divider()
-    st.header("3. Publish")
+    st.header("3. Generate Creatives (Dry Run)")
 
-    publish_mode = st.radio(
-        "When do you want to publish?",
-        ["Publish now", "Schedule for later"]
-    )
-
-    scheduled_time = None
-    if publish_mode == "Schedule for later":
-        scheduled_time = st.datetime_input("Select date & time")
-
-    publish_clicked = st.button("Publish")
+    publish_clicked = st.button("Generate Final Images")
 
     if publish_clicked:
-        with st.spinner("Generating creatives and publishing..."):
+        with st.spinner("Generating platform creatives..."):
 
-            # Step 4a: Decide layout rules based on chosen headline
+            # Layout decision
             layout = LayoutAgent().run(
                 st.session_state["headline"],
                 tone
             )
 
-            # Step 4b: Create the visual assets
+            # Generate resized + overlaid images
             creatives = ResizeAgent().run(
                 base_image_path=st.session_state["image_path"],
                 headline=st.session_state["headline"],
                 layout=layout,
             )
 
-            # Step 4c: Post/Export
-            PublisherAgent().run(
-                creatives=creatives,
-                captions=st.session_state["captions"]
-            )
+            # --- INTENTIONAL, KEPT FOR INTERVIEW ---
+            # Publishing intentionally disabled for demo stability
+            # PublisherAgent().run(
+            #     creatives={"linkedin": creatives.get("linkedin")},
+            #     captions={"linkedin": st.session_state["captions"].get("linkedin")},
+            #     post_to_linkedin=True
+            # )
 
-        if publish_mode == "Publish now":
-            st.success("Published successfully! Assets exported to /outputs.")
-        else:
-            st.success(f"Scheduled for {scheduled_time}")
+        st.success(
+            "Creatives generated successfully! "
+            "Check the /outputs folder for final images."
+        )

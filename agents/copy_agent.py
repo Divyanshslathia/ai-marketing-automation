@@ -1,13 +1,19 @@
 import json
 import re
 from services.ai_client import GeminiClient
+from utils.logger import log
+
 
 class CopyAgent:
     def __init__(self):
         self.client = GeminiClient()
 
     def run(self, inputs: dict) -> dict:
-        # Combined Prompt: Strategy + Creative
+        log(
+            "CopyAgent",
+            f"Received inputs: product={inputs.get('product_name')}, tone={inputs.get('tone')}"
+        )
+
         prompt = f"""
         You are a Marketing Strategist and Copywriter.
         Product: {inputs['product_name']}
@@ -30,9 +36,27 @@ class CopyAgent:
             }}
         }}
         """
+
         raw_response = self.client.generate(prompt)
-        return self._safe_json_parse(raw_response)
+
+        result = self._safe_json_parse(raw_response)
+
+        # High-signal agent "thinking" logs
+        log(
+            "CopyAgent",
+            f"Generated {len(result.get('headlines', []))} headlines"
+        )
+        log(
+            "CopyAgent",
+            f"Generated captions for platforms: {list(result.get('captions', {}).keys())}"
+        )
+
+        return result
 
     def _safe_json_parse(self, text: str) -> dict:
         match = re.search(r"\{.*\}", text, re.DOTALL)
-        return json.loads(match.group()) if match else {}
+        if not match:
+            log("CopyAgent", "Failed to parse JSON from model response")
+            return {}
+
+        return json.loads(match.group())

@@ -1,6 +1,7 @@
 import json
 import re
 from services.ai_client import GeminiClient
+from utils.logger import log
 
 
 class LayoutAgent:
@@ -13,6 +14,11 @@ class LayoutAgent:
         self.client = GeminiClient()
 
     def run(self, headline: str, tone: str) -> dict:
+        log(
+            "LayoutAgent",
+            f"Deciding layout for headline length={len(headline)} and tone='{tone}'"
+        )
+
         prompt = f"""
 You are a creative director designing ad visuals.
 
@@ -44,11 +50,16 @@ Return JSON with EXACTLY:
 """
 
         raw_response = self.client.generate(prompt)
-        return self._safe_json_parse(raw_response)
+        layout = self._safe_json_parse(raw_response)
+
+        log("LayoutAgent", f"Selected layout: {layout}")
+
+        return layout
 
     def _safe_json_parse(self, text: str) -> dict:
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if not match:
+            log("LayoutAgent", "Failed to parse JSON from model response")
             raise ValueError("No JSON object found in Gemini response")
 
         return json.loads(match.group())
