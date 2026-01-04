@@ -1,60 +1,35 @@
 from PIL import Image, ImageDraw, ImageFont
 
-
-def apply_text_overlay(
-    image_path: str,
-    output_path: str,
-    headline: str,
-    layout: dict,
-):
+def apply_text_overlay(img, headline, layout):
     """
-    Applies headline text to an image using layout rules.
+    Accepts a PIL Image object directly and returns the modified Image.
     """
-
-    img = Image.open(image_path).convert("RGBA")
+    img = img.convert("RGBA")
     width, height = img.size
-
     draw = ImageDraw.Draw(img)
 
-    # --- Font setup ---
-    font_size = int(width * 0.08)
-    font = ImageFont.load_default()
+    # Scale font size to image width (approx 6% of width)
+    # Note: For production, you'd bundle a .ttf font file
+    try:
+        font = ImageFont.truetype("arial.ttf", size=int(width * 0.06))
+    except:
+        font = ImageFont.load_default()
 
-    # --- Measure text ---
+    # Calculate text position
     text_bbox = draw.textbbox((0, 0), headline, font=font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
+    tw, th = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
+    
+    margin = int(layout.get("safe_margin_ratio", 0.1) * height)
+    x = (width - tw) // 2
+    
+    pos = layout.get("text_position", "bottom_center")
+    if pos == "top_center": y = margin
+    elif pos == "center": y = (height - th) // 2
+    else: y = height - th - margin
 
-    margin = int(layout["safe_margin_ratio"] * height)
+    # Draw background box
+    if layout.get("background_style") != "none":
+        draw.rectangle([x-10, y-10, x+tw+10, y+th+10], fill=(0,0,0,140))
 
-    # --- Position calculation ---
-    if layout["text_position"] == "top_center":
-        x = (width - text_width) // 2
-        y = margin
-    elif layout["text_position"] == "center":
-        x = (width - text_width) // 2
-        y = (height - text_height) // 2
-    else:  # bottom_center
-        x = (width - text_width) // 2
-        y = height - text_height - margin
-
-    # --- Background strip ---
-    if layout["background_style"] != "none":
-        padding = 20
-        rect_coords = [
-            x - padding,
-            y - padding,
-            x + text_width + padding,
-            y + text_height + padding,
-        ]
-        draw.rectangle(rect_coords, fill=(0, 0, 0, 160))
-
-    # --- Draw text ---
-    draw.text(
-        (x, y),
-        headline,
-        fill=layout["text_color"],
-        font=font,
-    )
-
-    img.save(output_path)
+    draw.text((x, y), headline, fill=layout.get("text_color", "white"), font=font)
+    return img
