@@ -135,6 +135,22 @@ No database is used. All state is held in memory for simplicity.
 ## Setup Instructions
 
 ### 1. Clone the repository
+
 ```bash
 git clone <repository-url>
 cd AgentProject
+
+### 2. Create and activate a virtual environment
+
+python -m venv venv
+venv\Scripts\activate
+
+### 3. Install dependencies
+pip install -r requirements.txt
+
+### 4. Set Environment Variable
+
+pip install -r requirements.txt
+ 
+### Run the Application
+streamlit run frontend.py
